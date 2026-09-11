@@ -1,0 +1,13 @@
+name = "Exceptional"
+uuid = "4e093d22-d6a2-45f1-aa0d-5a130779ebf5"
+version = "0.1.0"
+authors = ["Patrick Häcker <patrick.haecker@bosch.com>"]
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
