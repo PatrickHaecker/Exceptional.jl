@@ -1,6 +1,9 @@
 using Exceptional
 using Test
 
+include("automatic_storage.jl")
+include("shorthands.jl")
+
 struct AbsentValue end
 Base.isnothing(::AbsentValue) = true
 

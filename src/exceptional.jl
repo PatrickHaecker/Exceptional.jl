@@ -24,18 +24,22 @@ throw_diagnostic(exception::Exception) = throw(exception)
 throw_default(requirement, source, value) =
 	throw(ArgumentError(string("Check ", requirement, " failed", " for `", source, "`, got ", repr(value))))
 
-function diagnostic(regular, exceptional, check::Check)
+function diagnostic(regular, exceptional, check::Check, caller::Module)
 	isnothing(exceptional) && return :(throw_default($(check.requirement), $(string(regular)), value))
+	if exceptional isa String
+		slot = diagnostic_slot(caller, exceptional)
+		return :(throw_stored($slot.holder))
+	end
 	return :(throw_diagnostic($(esc(exceptional))))
 end
 
-function failure(regular, exceptional, check::Check, action::ControlFlowAction)
+function failure(regular, exceptional, check::Check, action::ControlFlowAction, caller::Module)
 	action === ReturnValue && return :(return $(esc(exceptional)))
-	action === ThrowValue && return diagnostic(regular, exceptional, check)
+	action === ThrowValue && return diagnostic(regular, exceptional, check, caller)
 	return esc(exceptional)
 end
 
-function control_flow(regular, exceptional, check::Check, on_success::ControlFlowAction, on_failure::ControlFlowAction)
+function control_flow(regular, exceptional, check::Check, on_success::ControlFlowAction, on_failure::ControlFlowAction, caller::Module)
 	success = if on_success === ReturnValue
 		:(return value)
 	elseif on_success === ThrowValue
@@ -43,7 +47,7 @@ function control_flow(regular, exceptional, check::Check, on_success::ControlFlo
 	else
 		:value
 	end
-	failure_branch = failure(regular, exceptional, check, on_failure)
+	failure_branch = failure(regular, exceptional, check, on_failure, caller)
 	return quote
 		local value = $(esc(regular))
         # `condition` uses `value` from the local scope.
@@ -59,13 +63,30 @@ function action(on_success::ControlFlowAction, on_failure::ControlFlowAction, re
 	return "$success when $requirement, otherwise $failure."
 end
 
+function define_macros(check::Check, prefix, suffix)
+	success = flowaction(prefix)
+	failure = flowaction(suffix, isempty(prefix) ? ReturnValue : ContinueValue)
+	name = Symbol(prefix, check.symbol, suffix)
+	default = failure === ThrowValue ? nothing : QuoteNode(check.sentinel)
+	names = check.symbol !== :⊤ || isempty(suffix) ? (name,) : (name, Symbol(prefix, suffix))
+	for spelling in names
+		@eval begin
+			@doc $(documentation(spelling, check, success, failure))
+			macro $spelling(regular, exceptional=$(QuoteNode(default)))
+				return control_flow(regular, exceptional, $check, $success, $failure, __module__)
+			end
+		end
+	end
+	return nothing
+end
+
 function documentation(name, check::Check, on_success::ControlFlowAction, on_failure::ControlFlowAction)
 	(; requirement, sentinel) = check
 	throwing = on_failure === ThrowValue
 	fallback = on_failure === ContinueValue
 	action_description = action(on_success, on_failure, requirement)
 	details = if throwing
-		"A string diagnostic becomes an `ArgumentError`; an `Exception` is thrown unchanged.\nWithout a diagnostic, report the tested source expression and result in an `ArgumentError`."
+		"A string diagnostic becomes an `ArgumentError`; an `Exception` is thrown unchanged. Literal string diagnostics reuse a hidden, preinitialized exception per macro expansion.\nWithout a diagnostic, report the tested source expression and result in an `ArgumentError`."
 	elseif fallback
 		"The fallback defaults to `$sentinel` and is never implicitly thrown."
 	else
