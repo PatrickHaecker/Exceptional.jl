@@ -23,6 +23,8 @@ The macro names consist of
 | `□` | `ismissing(value)` | `missing` | `\square` |
 | `✓` | `!(value isa Exception)` | `value` | `\checkmark` |
 | `✗` | `value isa Exception` | `value` | `\xmark` |
+| `⦱` | `!isempty(value)` | `value` | `\emptysetobar` |
+| `∅` | `isempty(value)` | `value` | `\emptyset` |
 
 Type a listed LaTeX sequence followed by Tab in Julia's REPL to insert the symbol.
 Julia 1.14 onwards hopefully have the [LaTeX completions for `⎋` or `✗`](https://github.com/JuliaLang/julia/pull/63238).
@@ -52,8 +54,8 @@ The tested expression is evaluated once, preserving short-circuit behavior.
 The second argument is evaluated only when the check fails.
 An explicit `@once` initializer instead runs during macro expansion (see below).
 
-Tested values are preserved, including custom objects recognized by `isnothing`
-or `ismissing`. Boolean checks require a `Bool` and raise `TypeError` otherwise.
+Tested values are preserved, including custom objects recognized by `isnothing`,
+`ismissing`, or `isempty`. Boolean checks require a `Bool` and raise `TypeError` otherwise.
 
 ```julia
 using Exceptional
@@ -91,6 +93,31 @@ and evaluated result.
 For example, `@⏎∃⎋ lookup(key) "not found"` returns a present result and throws an
 `ArgumentError` otherwise. `@⎋∃⏎ validation_error false` throws a present error object
 and returns `false` otherwise.
+
+## Empty Collections
+
+Use `@⦱` to continue with a nonempty value or return the original empty value
+from the enclosing function:
+
+```julia
+function process_items(items)
+    values = @⦱ items
+    return map(process, values)
+end
+```
+
+Use `@∅` for the complementary workflow: continue with an empty value or return
+the original nonempty value. An explicit second argument replaces the default,
+for example `@⦱ items nothing` returns `nothing` when `items` is empty.
+
+These checks call `isempty` once and preserve the already evaluated value without
+copying or constructing an empty replacement. They support strings, tuples,
+collections, and custom types implementing `isempty`. They do not treat `nothing`
+or `missing` as empty sentinels. Any errors or iteration side effects from the
+type's `isempty` implementation are preserved.
+
+All nine affix combinations are available. Throw suffixes retain the usual
+diagnostic behavior, for example `@⦱⎋ items "items must not be empty"`.
 
 ## Returned Exceptions
 

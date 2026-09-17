@@ -5,6 +5,7 @@ include("automatic_storage.jl")
 include("shorthands.jl")
 include("once.jl")
 include("exception_checks.jl")
+include("empty_checks.jl")
 
 struct AbsentValue end
 Base.isnothing(::AbsentValue) = true
@@ -25,6 +26,8 @@ const families = (
     ("□", missing, 42, missing),
     ("✓", 42, CustomException(1), :tested_value),
     ("✗", CustomException(1), 42, :tested_value),
+    ("⦱", [1, 2], Int[], :tested_value),
+    ("∅", Int[], [1, 2], :tested_value),
 )
 
 const spellings = (
