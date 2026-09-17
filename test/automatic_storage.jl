@@ -45,7 +45,7 @@ function stored_render(holder, output)
 end
 
 @testset "Automatic exception storage" begin
-    slotnames = filter(name -> startswith(string(name), "##exceptional_diagnostic"), names(StorageSites; all=true))
+    slotnames = filter(name -> startswith(string(name), "##once_slot"), names(StorageSites; all=true))
     slots = [getfield(StorageSites, name) for name in slotnames]
     @test length(slots) == 3
     @test all(slot -> slot.holder isa Ref{Any}, slots)
@@ -85,5 +85,5 @@ end
     end
     tasks = [Threads.@spawn stored_roundtrip(StorageSites.checked, devnull) for attempt in 1:8]
     @test all(fetch, tasks)
-    @test filter(name -> startswith(string(name), "##exceptional_diagnostic"), names(StorageSites; all=true)) == slotnames
+    @test filter(name -> startswith(string(name), "##once_slot"), names(StorageSites; all=true)) == slotnames
 end

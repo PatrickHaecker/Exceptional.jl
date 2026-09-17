@@ -45,6 +45,7 @@ All nine forms support each check. So in the following, you can replace `∃` by
 Continuing means evaluating to a value without exiting the enclosing function.
 The tested expression is evaluated once, preserving short-circuit behavior.
 The second argument is evaluated only when the check fails.
+An explicit `@once` initializer instead runs during macro expansion (see below).
 
 Tested values are preserved, including custom objects recognized by `isnothing`
 or `ismissing`. Boolean checks require a `Bool` and raise `TypeError` otherwise.
@@ -77,8 +78,8 @@ The fallback is evaluated only when the check fails and is never implicitly thro
 For example, `@⎋∃ validation_error` throws a present error object and continues
 with `nothing` when it is absent.
 
-Throw suffixes evaluate diagnostics only on the throwing branch. A message
-becomes an `ArgumentError`, while an `Exception` value is thrown unchanged.
+Throw suffixes evaluate diagnostics only on the throwing branch. An `AbstractString`
+diagnostic becomes an `ArgumentError`, while every other value is thrown unchanged.
 With no diagnostic, the error reports the failed check, tested source expression,
 and evaluated result.
 
@@ -147,6 +148,26 @@ catch e
 end
 ```
 
+Use `@once` for other exception types or arbitrary objects:
+
+```julia
+function checked_domain(input)
+    @⎋ input > 0 @once DomainError(-1, "input must be positive")
+    return input
+end
+```
+
+`@once` evaluates its expression in the caller's module during macro expansion,
+once per annotated call site, and reuses the object across calls and method
+specializations. It can use existing module globals, not function locals.
+`@once` preserves its result without conversion. Throwing suffixes still interpret
+strings as diagnostics: `@⎋ condition @once "message"` throws a cached
+`ArgumentError`. Only concrete `String` messages get cached wrappers. Other
+`AbstractString` diagnostics are wrapped on failure without forcing their text
+during macro expansion. Returns and throw prefixes preserve the stored value.
+Mutable objects are shared without copying or
+synchronization, so callers must coordinate mutation and concurrent use.
+
 ### Throwing Versus Returning
 
 Returning an exception avoids stack unwinding and backtrace recording. For an
@@ -155,21 +176,17 @@ expected failure, use `@⊤` to return the exception when the check fails:
 ```julia
 using Exceptional
 
-const input_error = Ref{Any}(ArgumentError("input must be positive"))
-
 function checked_input_return(input)
-    @⊤ input > 0 input_error[]
+    @⊤ input > 0 @once ArgumentError("input must be positive")
     return input
 end
 
-result = checked_input_return(-5)
-@assert result === input_error[]
-@assert checked_input_return(5) == 5
+checked_input_return(-5) # ArgumentError("input must be positive")
+checked_input_return(5)  # 5
 ```
 
-The `Ref{Any}` holds a preallocated exception for reuse without allocating on
-each return. Returning an exception does not throw it: callers must inspect and
-handle the returned value.
+`@once` reuses the exception without allocating on each return. Returning an
+exception does not throw it: callers must inspect and handle the returned value.
 
 Example timings on Julia 1.13.0:
 
@@ -182,6 +199,5 @@ Avoiding allocations does not remove the cost of throwing.
 
 Throwing can still allocate during compilation, when Julia grows its exception
 stack or collects backtraces, or when a handler formats or prints the error.
-Automatic exception reuse applies only to literal string diagnostics.
-Interpolated strings, runtime messages, supplied exception objects, and default
-diagnostics can still allocate on failure.
+Exception reuse applies to literal string diagnostics and explicit `@once`
+expressions. Other diagnostics can still allocate on failure.

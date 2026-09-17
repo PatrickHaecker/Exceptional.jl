@@ -11,8 +11,10 @@ export @⏎∃⎋, @⏎∄⎋, @⏎⊤⎋, @⏎⊥⎋, @⏎✓⎋, @⏎⍰⎋
 export @⎋∃⏎, @⎋∄⏎, @⎋⊤⏎, @⎋⊥⏎, @⎋✓⏎, @⎋⍰⏎
 export @⎋∃⎋, @⎋∄⎋, @⎋⊤⎋, @⎋⊥⎋, @⎋✓⎋, @⎋⍰⎋
 
+export @once
+
 include("exceptional.jl")
-include("storage.jl")
+include("once.jl")
 
 const affixes = ("", "⏎", "⎋")
 

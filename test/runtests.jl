@@ -3,6 +3,7 @@ using Test
 
 include("automatic_storage.jl")
 include("shorthands.jl")
+include("once.jl")
 
 struct AbsentValue end
 Base.isnothing(::AbsentValue) = true
