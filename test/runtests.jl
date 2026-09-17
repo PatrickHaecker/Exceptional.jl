@@ -4,6 +4,7 @@ using Test
 include("automatic_storage.jl")
 include("shorthands.jl")
 include("once.jl")
+include("exception_checks.jl")
 
 struct AbsentValue end
 Base.isnothing(::AbsentValue) = true
@@ -20,8 +21,10 @@ const families = (
     ("∄", nothing, 42, nothing),
     ("⊤", true, false, nothing),
     ("⊥", false, true, nothing),
-    ("✓", 42, missing, missing),
-    ("⍰", missing, 42, missing),
+    ("■", 42, missing, missing),
+    ("□", missing, 42, missing),
+    ("✓", 42, CustomException(1), :tested_value),
+    ("✗", CustomException(1), 42, :tested_value),
 )
 
 const spellings = (
@@ -56,8 +59,8 @@ end
     @test !isnothing(@∃ 42)
     @test !isnothing(@⊤ true)
     @test !isnothing(@⊥ false)
-    @test !ismissing(@✓ 42)
-    @test ismissing(@⍰ missing)
+    @test !ismissing(@■ 42)
+    @test ismissing(@□ missing)
 end
 
 @testset "Control-flow contract" begin
@@ -92,7 +95,8 @@ end
                     for exceptional in (nothing, missing, "failure", DomainError(7, "failure"), CustomException(7), [1, 2])
                         @test outcome(explicit_function, input, exceptional) === expectedoutcome(action, input, exceptional)
                     end
-                    @test outcome(default_function, input) === expectedoutcome(action, input, sentinel)
+                    default = sentinel === :tested_value ? input : sentinel
+                    @test outcome(default_function, input) === expectedoutcome(action, input, default)
                 end
             end
         end
@@ -108,6 +112,7 @@ end
             run = @eval (tested, diagnostic) -> begin
                 value = :caller_value
                 isnothing = ismissing = throw = throw_diagnostic = throw_default = error
+                Exception = Nothing
                 result = $invocation
                 return (:continued, result)
             end
@@ -136,9 +141,12 @@ end
 @testset "Preserve predicate-matching objects" begin
     for (stem, input, matches) in (
         ("∄", AbsentValue(), true), ("∃", AbsentValue(), false),
-        ("⍰", UnknownValue(), true), ("✓", UnknownValue(), false),
+        ("□", UnknownValue(), true), ("■", UnknownValue(), false),
         ("∃", [1, 2], true), ("∄", [1, 2], false),
-        ("✓", [1, 2], true), ("⍰", [1, 2], false),
+        ("■", [1, 2], true), ("□", [1, 2], false),
+        ("✓", CustomException(2), false), ("✗", CustomException(2), true),
+        ("✓", nothing, true), ("✗", nothing, false),
+        ("✓", missing, true), ("✗", missing, false),
     )
         for (prefix, suffix, matching, nonmatching) in spellings
             invocation = Expr(:macrocall, Symbol("@", prefix, stem, suffix),
@@ -154,9 +162,9 @@ end
     end
     input = [1, 2]
     @test (@⎋∄ input) === nothing
-    @test (@⎋⍰ input) === missing
+    @test (@⎋□ input) === missing
     @test (@⎋∃ AbsentValue()) === nothing
-    @test (@⎋✓ UnknownValue()) === missing
+    @test (@⎋■ UnknownValue()) === missing
     @test (@⎋∄ input input) === input
 end
 
@@ -198,7 +206,7 @@ end
         value = :caller_value
         temp = :caller_temp
         isnothing = ismissing = throw_diagnostic = throw_default = error
-        result = @∃⎋ (@✓⎋ input)
+        result = @∃⎋ (@■⎋ input)
         return result, value, temp
     end
     @test shadowed(42) === (42, :caller_value, :caller_temp)
@@ -206,7 +214,7 @@ end
     @test_throws ArgumentError shadowed(missing)
 
     function nested(input)
-        result = @∃ (@✓ input :inner) :outer
+        result = @∃ (@■ input :inner) :outer
         return (:continued, result)
     end
     @test nested(42) === (:continued, 42)
@@ -214,7 +222,7 @@ end
     @test nested(missing) === :inner
 
     function nested_return(input)
-        result = @∃ (@⏎✓ input nothing) :outer
+        result = @∃ (@⏎■ input nothing) :outer
         return (:continued, result)
     end
     @test nested_return(42) === 42
@@ -230,7 +238,7 @@ end
     function nested_throw(input)
         value = :caller_value
         isnothing = ismissing = throw_default = throw = error
-        result = @⎋∄ (@⎋⍰ input input) input
+        result = @⎋∄ (@⎋□ input input) input
         return result, value
     end
     @test nested_throw(42) === (42, :caller_value)
@@ -274,9 +282,9 @@ end
     @test calls[] == 2
     for value in ("literal message", DomainError(7, "invalid"), CustomException(7), [1, 2])
         @test outcome(() -> (@⎋∃ value error("unused fallback"))) === (:thrown, value)
-        @test outcome(() -> (@⎋✓ value)) === (:thrown, value)
+        @test outcome(() -> (@⎋■ value)) === (:thrown, value)
         @test (@⎋∃ nothing value) === value
-        @test (@⎋✓ missing value) === value
+        @test (@⎋■ missing value) === value
     end
 end
 
@@ -298,6 +306,9 @@ end
 end
 
 @testset "Macro spelling and documentation" begin
+    for (prefix, suffix, _, _) in spellings
+        @test !isdefined(Exceptional, Symbol("@", prefix, "⍰", suffix))
+    end
     for (check, _, _, _) in families, (prefix, suffix, _, _) in spellings
         name = Symbol("@", prefix, check, suffix)
         @test Base.isexported(Exceptional, name)

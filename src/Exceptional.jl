@@ -1,15 +1,15 @@
 module Exceptional
 
 export @⏎, @⎋, @⏎⏎, @⏎⎋, @⎋⏎, @⎋⎋
-export @∃, @∄, @⊤, @⊥, @✓, @⍰
-export @∃⏎, @∄⏎, @⊤⏎, @⊥⏎, @✓⏎, @⍰⏎
-export @∃⎋, @∄⎋, @⊤⎋, @⊥⎋, @✓⎋, @⍰⎋
-export @⏎∃, @⏎∄, @⏎⊤, @⏎⊥, @⏎✓, @⏎⍰
-export @⎋∃, @⎋∄, @⎋⊤, @⎋⊥, @⎋✓, @⎋⍰
-export @⏎∃⏎, @⏎∄⏎, @⏎⊤⏎, @⏎⊥⏎, @⏎✓⏎, @⏎⍰⏎
-export @⏎∃⎋, @⏎∄⎋, @⏎⊤⎋, @⏎⊥⎋, @⏎✓⎋, @⏎⍰⎋
-export @⎋∃⏎, @⎋∄⏎, @⎋⊤⏎, @⎋⊥⏎, @⎋✓⏎, @⎋⍰⏎
-export @⎋∃⎋, @⎋∄⎋, @⎋⊤⎋, @⎋⊥⎋, @⎋✓⎋, @⎋⍰⎋
+export @∃, @∄, @⊤, @⊥, @■, @□, @✓, @✗
+export @∃⏎, @∄⏎, @⊤⏎, @⊥⏎, @■⏎, @□⏎, @✓⏎, @✗⏎
+export @∃⎋, @∄⎋, @⊤⎋, @⊥⎋, @■⎋, @□⎋, @✓⎋, @✗⎋
+export @⏎∃, @⏎∄, @⏎⊤, @⏎⊥, @⏎■, @⏎□, @⏎✓, @⏎✗
+export @⎋∃, @⎋∄, @⎋⊤, @⎋⊥, @⎋■, @⎋□, @⎋✓, @⎋✗
+export @⏎∃⏎, @⏎∄⏎, @⏎⊤⏎, @⏎⊥⏎, @⏎■⏎, @⏎□⏎, @⏎✓⏎, @⏎✗⏎
+export @⏎∃⎋, @⏎∄⎋, @⏎⊤⎋, @⏎⊥⎋, @⏎■⎋, @⏎□⎋, @⏎✓⎋, @⏎✗⎋
+export @⎋∃⏎, @⎋∄⏎, @⎋⊤⏎, @⎋⊥⏎, @⎋■⏎, @⎋□⏎, @⎋✓⏎, @⎋✗⏎
+export @⎋∃⎋, @⎋∄⎋, @⎋⊤⎋, @⎋⊥⎋, @⎋■⎋, @⎋□⎋, @⎋✓⎋, @⎋✗⎋
 
 export @once
 
@@ -23,8 +23,10 @@ for check in (
 	Check(:∄, :(isnothing(value)), nothing),
 	Check(:⊤, :value, nothing),
 	Check(:⊥, :(value ? false : true), nothing),
-	Check(:✓, :(!ismissing(value)), missing),
-	Check(:⍰, :(ismissing(value)), missing),
+	Check(:■, :(!ismissing(value)), missing),
+	Check(:□, :(ismissing(value)), missing),
+	Check(:✓, :(!(value isa Exception)), ReuseValue()),
+	Check(:✗, :(value isa Exception), ReuseValue()),
 )
 	for prefix in affixes, suffix in affixes
 		define_macros(check, prefix, suffix)

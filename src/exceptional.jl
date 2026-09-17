@@ -6,14 +6,17 @@ function flowaction(affix, default=ContinueValue)
 	return default
 end
 
+# Mark a default that reuses the already evaluated value during macro expansion.
+struct ReuseValue end
+
 struct Check
 	symbol::Symbol
-	condition::Union{Symbol,Expr}
-	sentinel::Union{Nothing,Missing}
+	condition::Union{Symbol, Expr}
+	sentinel::Union{Nothing, Missing, ReuseValue}
 	requirement::String
 end
 
-function Check(symbol::Symbol, condition::Union{Symbol,Expr}, sentinel::Union{Nothing,Missing})
+function Check(symbol::Symbol, condition::Union{Symbol,Expr}, sentinel::Union{Nothing, Missing, ReuseValue})
 	requirement = symbol === :⊤ ? "the tested value is `true`" : symbol === :⊥ ? "the tested value is `false`" : "`$(string(condition))` is true"
 	return Check(symbol, condition, sentinel, requirement)
 end
@@ -56,9 +59,9 @@ function diagnostic(regular, exceptional, check::Check, caller::Module)
 end
 
 function failure(regular, exceptional, check::Check, action::ControlFlowAction, caller::Module)
-	action === ReturnValue && return :(return $(esc(exceptional)))
 	action === ThrowValue && return diagnostic(regular, exceptional, check, caller)
-	return esc(exceptional)
+	expression = exceptional isa ReuseValue ? :value : esc(exceptional)
+	return action === ReturnValue ? :(return $expression) : expression
 end
 
 function control_flow(regular, exceptional, check::Check, on_success::ControlFlowAction, on_failure::ControlFlowAction, caller::Module)
@@ -90,7 +93,7 @@ function define_macros(check::Check, prefix, suffix)
 	success = flowaction(prefix)
 	failure = flowaction(suffix, isempty(prefix) ? ReturnValue : ContinueValue)
 	name = Symbol(prefix, check.symbol, suffix)
-	default = failure === ThrowValue ? nothing : QuoteNode(check.sentinel)
+	default = failure === ThrowValue ? nothing : check.sentinel isa ReuseValue ? check.sentinel : QuoteNode(check.sentinel)
 	names = check.symbol !== :⊤ || isempty(suffix) ? (name,) : (name, Symbol(prefix, suffix))
 	for spelling in names
 		@eval begin
@@ -105,20 +108,22 @@ end
 
 function documentation(name, check::Check, on_success::ControlFlowAction, on_failure::ControlFlowAction)
 	(; requirement, sentinel) = check
+	default_description = sentinel isa ReuseValue ? "the tested value" : "`$sentinel`"
+	default_signature = sentinel isa ReuseValue ? "regular" : string(sentinel)
 	throwing = on_failure === ThrowValue
 	fallback = on_failure === ContinueValue
 	action_description = action(on_success, on_failure, requirement)
 	details = if throwing
 		"A string diagnostic becomes an `ArgumentError`; any other value is thrown unchanged. Literal string diagnostics reuse a hidden, preinitialized exception per macro expansion.\nWithout a diagnostic, report the tested source expression and result in an `ArgumentError`."
 	elseif fallback
-		"The fallback defaults to `$sentinel` and is never implicitly thrown."
+		"The fallback defaults to $default_description and is never implicitly thrown."
 	else
-		"The exceptional value defaults to `$sentinel` and is never implicitly thrown."
+		"The exceptional value defaults to $default_description and is never implicitly thrown."
 	end
 	if on_success === ThrowValue
 		details = "The tested value is passed directly to `throw`, including strings and non-exception objects.\n" * details
 	end
-	signature = "@$name regular " * (throwing ? "[diagnostic]" : fallback ? "fallback=$sentinel" : "exceptional=$sentinel")
+	signature = "@$name regular " * (throwing ? "[diagnostic]" : fallback ? "fallback=$default_signature" : "exceptional=$default_signature")
 	evaluation = throwing ? "The diagnostic expression is evaluated only when the check fails." : fallback ? "The fallback expression is evaluated only when the check fails." : "The exceptional expression is evaluated only when the check fails."
 	return "    $signature\n\n$action_description\n\n$details\nThe tested expression is evaluated once. $evaluation\nAn explicit `@once` initializer instead runs in the caller's module during macro expansion. Throw suffixes cache an `ArgumentError` for a stored `String`, wrap other `AbstractString` values on failure, and throw other stored objects unchanged. Returns and throw prefixes preserve the stored value.\nContinuing with a value means evaluating to it without exiting the enclosing function.\nA prefix acts when the check holds; a suffix acts when it fails. An omitted suffix continues with a fallback when a prefix is present, otherwise it returns the exceptional value."
 end

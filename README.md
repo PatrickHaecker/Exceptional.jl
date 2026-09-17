@@ -7,20 +7,25 @@ The macro names consist of
 - a check (`⊤` can be omitted when a suffix is present)
 - a suffix (optional)
 
-| Prefix | When the check holds |
-| --- | --- |
-| (none) | Continue with the tested value |
-| `⏎` | Return the tested value from the enclosing function |
-| `⎋` | Throw the tested value |
-
-| Check | Meaning | Default exceptional value or fallback |
+| Prefix | When the check holds | LaTeX completion |
 | --- | --- | --- |
-| `∃` | `!isnothing(value)` | `nothing` |
-| `∄` | `isnothing(value)` | `nothing` |
-| `⊤` | The value is `true` | `nothing` |
-| `⊥` | The value is `false` | `nothing` |
-| `✓` | `!ismissing(value)` | `missing` |
-| `⍰` | `ismissing(value)` | `missing` |
+| (none) | Continue with the tested value | Not applicable |
+| `⏎` | Return the tested value from the enclosing function | `\varcarriagereturn` |
+| `⎋` | Throw the tested value | Not built in | `\escape` |
+
+| Check | Meaning | Default exceptional value or fallback | LaTeX completion |
+| --- | --- | --- | --- |
+| `∃` | `!isnothing(value)` | `nothing` | `\exists` |
+| `∄` | `isnothing(value)` | `nothing` | `\nexists` |
+| `⊤` | The value is `true` | `nothing` | `\top` |
+| `⊥` | The value is `false` | `nothing` | `\bot` |
+| `■` | `!ismissing(value)` | `missing` | `\blacksquare` |
+| `□` | `ismissing(value)` | `missing` | `\square` |
+| `✓` | `!(value isa Exception)` | `value` | `\checkmark` |
+| `✗` | `value isa Exception` | `value` | `\xmark` |
+
+Type a listed LaTeX sequence followed by Tab in Julia's REPL to insert the symbol.
+Julia 1.14 onwards hopefully have the [LaTeX completions for `⎋` or `✗`](https://github.com/JuliaLang/julia/pull/63238).
 
 | Suffix | When the check fails |
 | --- | --- |
@@ -73,7 +78,7 @@ Return actions do not implicitly throw exception objects or strings.
 
 Throw prefixes pass the tested value directly to `throw` when the check holds,
 including strings, Booleans, and other non-exception objects. Without a suffix, they
-evaluate to the fallback, which defaults to the sentinel in the table above.
+evaluate to the fallback, whose default is listed in the table above.
 The fallback is evaluated only when the check fails and is never implicitly thrown.
 For example, `@⎋∃ validation_error` throws a present error object and continues
 with `nothing` when it is absent.
@@ -86,6 +91,39 @@ and evaluated result.
 For example, `@⏎∃⎋ lookup(key) "not found"` returns a present result and throws an
 `ArgumentError` otherwise. `@⎋∃⏎ validation_error false` throws a present error object
 and returns `false` otherwise.
+
+## Returned Exceptions
+
+Use `@✓` to continue with a non-exception result or return the original exception
+from the enclosing function:
+
+```julia
+function process_input(input)
+    value = @✓ compute(input)
+    return transform(value)
+end
+```
+
+Use `@✗` for the complementary workflow: continue with an exception to handle it,
+or return the successful result unchanged:
+
+```julia
+function recover_input(input)
+    exception = @✗ compute(input)
+    return recover(exception)
+end
+```
+
+Both checks evaluate the tested expression once. Their default exceptional value
+or fallback is that already evaluated value. An explicit second argument replaces
+the default, for example `@✓ compute(input) nothing` returns `nothing` on failure.
+These checks inspect returned objects with `isa Exception`; they do not catch
+thrown exceptions. `nothing` and `missing` are non-exception results.
+
+All nine affix combinations are available. Throw suffixes retain the usual
+diagnostic behavior, including an `ArgumentError` describing the failed check
+when the diagnostic is omitted. Use `@⎋✗ result` to throw a returned exception
+itself and continue with a non-exception result unchanged.
 
 ## Boolean Shorthands
 
