@@ -27,7 +27,7 @@ The macro names consist of
 | `∅` | `isempty(value)` | `value` | `\emptyset` |
 
 Type a listed LaTeX sequence followed by Tab in Julia's REPL to insert the symbol.
-Julia 1.14 onwards hopefully have the [LaTeX completions for `⎋` or `✗`](https://github.com/JuliaLang/julia/pull/63238).
+The LaTeX completions for `⎋` and `✗` need at least Julia 1.14.
 
 | Suffix | When the check fails |
 | --- | --- |
