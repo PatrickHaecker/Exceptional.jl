@@ -11,9 +11,9 @@ The macro names consist of
 | --- | --- | --- |
 | (none) | Continue with the tested value | Not applicable |
 | `⏎` | Return the tested value from the enclosing function | `\varcarriagereturn` |
-| `⎋` | Throw the tested value | Not built in | `\escape` |
+| `⎋` | Throw the tested value | `\escape` |
 
-| Check | Meaning | Default exceptional value or fallback | LaTeX completion |
+| Check | Meaning | Default on failure | LaTeX completion |
 | --- | --- | --- | --- |
 | `∃` | `!isnothing(value)` | `nothing` | `\exists` |
 | `∄` | `isnothing(value)` | `nothing` | `\nexists` |
