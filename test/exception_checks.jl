@@ -98,9 +98,9 @@ end
         @test propagate(input) === (:continued, input)
         @test handle(input) === input
     end
-    fallback(input, value) = (@✓ input value; :continued)
-    @test fallback(exception, nothing) === nothing
-    @test fallback(42, nothing) === :continued
+    explicit_default(input, default) = (@✓ input default; :continued)
+    @test explicit_default(exception, nothing) === nothing
+    @test explicit_default(42, nothing) === :continued
     calls = Ref(0)
     function hygienic(input)
         value = :caller_value

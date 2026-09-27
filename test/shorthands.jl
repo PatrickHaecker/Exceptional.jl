@@ -28,17 +28,17 @@ end
         for source in ("$name input", "$name(input)")
             @test Meta.parse(source).args[1] === name
         end
-        for diagnostic in ((), (:exceptional,), ("literal diagnostic",))
+        for default_argument in ((), (:default,), ("literal default",))
             functions = map((name, Symbol("@", explicit))) do macro_name
-                invocation = Expr(:macrocall, macro_name, LineNumberNode(@__LINE__), :input, diagnostic...)
-                @eval (input, exceptional) -> begin
+            invocation = Expr(:macrocall, macro_name, LineNumberNode(@__LINE__), :input, default_argument...)
+            @eval (input, default) -> begin
                     value = $invocation
                     return (:continued, value)
                 end
             end
-            for input in (true, false, 1, nothing), exceptional in (nothing, "message", ArgumentError("existing"))
-                actual = shorthand_outcome(functions[1], input, exceptional)
-                expected = shorthand_outcome(functions[2], input, exceptional)
+            for input in (true, false, 1, nothing), default in (nothing, "message", ArgumentError("existing"))
+                actual = shorthand_outcome(functions[1], input, default)
+                expected = shorthand_outcome(functions[2], input, default)
                 @test actual[1] === expected[1]
                 if expected[1] === :thrown && expected[2] isa Exception
                     @test typeof(actual[2]) === typeof(expected[2])
@@ -49,8 +49,8 @@ end
             end
         end
 
-        invocation = Expr(:macrocall, name, LineNumberNode(@__LINE__), :(tested()), :(diagnostic()))
-        run = @eval (tested, diagnostic) -> begin
+        invocation = Expr(:macrocall, name, LineNumberNode(@__LINE__), :(tested()), :(default()))
+        run = @eval (tested, default) -> begin
             throw = throw_default = throw_diagnostic = throw_stored = error
             value = $invocation
             return value
@@ -58,9 +58,9 @@ end
         for input in (true, false)
             events = Symbol[]
             tested = () -> (push!(events, :tested); input)
-            diagnostic = () -> (push!(events, :diagnostic); ArgumentError("failure"))
-            shorthand_outcome(run, tested, diagnostic)
-            @test events == (input ? [:tested] : [:tested, :diagnostic])
+            default = () -> (push!(events, :default); ArgumentError("failure"))
+            shorthand_outcome(run, tested, default)
+            @test events == (input ? [:tested] : [:tested, :default])
         end
     end
 end

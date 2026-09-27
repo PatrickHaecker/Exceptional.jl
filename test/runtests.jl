@@ -31,14 +31,14 @@ const families = (
 )
 
 const spellings = (
-    ("", "", :continue_value, :return_exceptional),
-    ("", "⏎", :continue_value, :return_exceptional),
+    ("", "", :continue_value, :return_default),
+    ("", "⏎", :continue_value, :return_default),
     ("", "⎋", :continue_value, :throw),
-    ("⏎", "", :return_value, :continue_exceptional),
-    ("⎋", "", :throw_value, :continue_exceptional),
-    ("⏎", "⏎", :return_value, :return_exceptional),
+    ("⏎", "", :return_value, :continue_default),
+    ("⎋", "", :throw_value, :continue_default),
+    ("⏎", "⏎", :return_value, :return_default),
     ("⏎", "⎋", :return_value, :throw),
-    ("⎋", "⏎", :throw_value, :return_exceptional),
+    ("⎋", "⏎", :throw_value, :return_default),
     ("⎋", "⎋", :throw_value, :throw),
 )
 
@@ -50,12 +50,12 @@ function outcome(callable, args...)
     end
 end
 
-function expectedoutcome(action, input, exceptional)
-    action === :throw && return :thrown, exceptional
+function expectedoutcome(action, input, default)
+    action === :throw && return :thrown, default
     action === :throw_value && return :thrown, input
     action === :return_value && return :returned, input
-    action === :return_exceptional && return :returned, exceptional
-    return :returned, (:continued, action === :continue_value ? input : exceptional)
+    action === :return_default && return :returned, default
+    return :returned, (:continued, action === :continue_value ? input : default)
 end
 
 @testset "Original examples" begin
@@ -67,12 +67,12 @@ end
 end
 
 @testset "Control-flow contract" begin
-    for (stem, accepted, rejected, sentinel) in families
+    for (stem, accepted, rejected, default_value) in families
         for (prefix, suffix, matching, nonmatching) in spellings
             name = Symbol("@", prefix, stem, suffix)
-            explicit = Expr(:macrocall, name, LineNumberNode(@__LINE__), :input, :exceptional)
+            explicit = Expr(:macrocall, name, LineNumberNode(@__LINE__), :input, :default)
             omitted = Expr(:macrocall, name, LineNumberNode(@__LINE__), :input)
-            explicit_function = @eval (input, exceptional) -> begin
+            explicit_function = @eval (input, default) -> begin
                 result = $explicit
                 return (:continued, result)
             end
@@ -91,15 +91,15 @@ end
                     for fragment in ("failed", "input", repr(input))
                         @test occursin(fragment, caught.msg)
                     end
-                    for exceptional in (DomainError(7, "failure"), CustomException(7))
-                        @test outcome(explicit_function, input, exceptional) === (:thrown, exceptional)
+                    for default in (DomainError(7, "failure"), CustomException(7))
+                        @test outcome(explicit_function, input, default) === (:thrown, default)
                     end
                 else
-                    for exceptional in (nothing, missing, "failure", DomainError(7, "failure"), CustomException(7), [1, 2])
-                        @test outcome(explicit_function, input, exceptional) === expectedoutcome(action, input, exceptional)
+                    for default in (nothing, missing, "failure", DomainError(7, "failure"), CustomException(7), [1, 2])
+                        @test outcome(explicit_function, input, default) === expectedoutcome(action, input, default)
                     end
-                    default = sentinel === :tested_value ? input : sentinel
-                    @test outcome(default_function, input) === expectedoutcome(action, input, default)
+                    expected_default = default_value === :tested_value ? input : default_value
+                    @test outcome(default_function, input) === expectedoutcome(action, input, expected_default)
                 end
             end
         end
@@ -111,8 +111,8 @@ end
         for (prefix, suffix, matching, nonmatching) in spellings
             name = Symbol("@", prefix, stem, suffix)
             invocation = Expr(:macrocall, name, LineNumberNode(@__LINE__),
-                              :(tested()), :(diagnostic()))
-            run = @eval (tested, diagnostic) -> begin
+                              :(tested()), :(default()))
+            run = @eval (tested, default) -> begin
                 value = :caller_value
                 isnothing = ismissing = throw = throw_diagnostic = throw_default = error
                 Exception = Nothing
@@ -125,13 +125,13 @@ end
                 events = Symbol[]
                 tested = () -> (push!(events, :tested); input)
                 exception = CustomException(1)
-                diagnostic = () -> (push!(events, :diagnostic); exception)
-                @test outcome(run, tested, diagnostic) === expectedoutcome(action, input, exception)
-                evaluates_diagnostic = action in (:throw, :return_exceptional, :continue_exceptional)
-                @test events == (evaluates_diagnostic ? [:tested, :diagnostic] : [:tested])
+                default = () -> (push!(events, :default); exception)
+                @test outcome(run, tested, default) === expectedoutcome(action, input, exception)
+                evaluates_default = action in (:throw, :return_default, :continue_default)
+                @test events == (evaluates_default ? [:tested, :default] : [:tested])
             end
             unbound = Expr(:macrocall, name, LineNumberNode(@__LINE__), :input,
-                           :undefined_exceptional_binding)
+                           :undefined_default_binding)
             accepted_function = @eval input -> begin
                 result = $unbound
                 return (:continued, result)
@@ -153,14 +153,14 @@ end
     )
         for (prefix, suffix, matching, nonmatching) in spellings
             invocation = Expr(:macrocall, Symbol("@", prefix, stem, suffix),
-                              LineNumberNode(@__LINE__), :input, :exceptional)
-            run = @eval (input, exceptional) -> begin
+                              LineNumberNode(@__LINE__), :input, :default)
+            run = @eval (input, default) -> begin
                 result = $invocation
                 return (:continued, result)
             end
-            exceptional = CustomException(1)
+            default = CustomException(1)
             action = matches ? matching : nonmatching
-            @test outcome(run, input, exceptional) === expectedoutcome(action, input, exceptional)
+            @test outcome(run, input, default) === expectedoutcome(action, input, default)
         end
     end
     input = [1, 2]
@@ -184,8 +184,8 @@ end
         for operator in (:&&, :||)
             condition = Expr(operator, :(left()), :(right()))
             invocation = Expr(:macrocall, Symbol("@", prefix, stem, suffix),
-                              LineNumberNode(@__LINE__), condition, :exceptional)
-            run = @eval (left, right, exceptional) -> begin
+                              LineNumberNode(@__LINE__), condition, :default)
+            run = @eval (left, right, default) -> begin
                 result = $invocation
                 return (:continued, result)
             end
@@ -196,8 +196,8 @@ end
                 evaluates_right = operator === :&& ? left_value : !left_value
                 input = evaluates_right ? right_value : left_value
                 action = input === accepted ? matching : nonmatching
-                exceptional = CustomException(1)
-                @test outcome(run, left, right, exceptional) === expectedoutcome(action, input, exceptional)
+                default = CustomException(1)
+                @test outcome(run, left, right, default) === expectedoutcome(action, input, default)
                 @test events == (evaluates_right ? [:left, :right] : [:left])
             end
         end
@@ -250,13 +250,13 @@ end
 
     for (stem, accepted, rejected, _) in families, (prefix, suffix, matching, _) in spellings
         invocation = Expr(:macrocall, Symbol("@", prefix, stem, suffix),
-                          LineNumberNode(@__LINE__), :input, :(return :from_exceptional))
+                          LineNumberNode(@__LINE__), :input, :(return :from_default))
         run = @eval input -> begin
             result = $invocation
             return (:continued, result)
         end
         @test outcome(run, accepted) === expectedoutcome(matching, accepted, nothing)
-        @test run(rejected) === :from_exceptional
+        @test run(rejected) === :from_default
     end
 end
 
@@ -284,7 +284,7 @@ end
     @test outcome(() -> (@⎋∃ 42 "message: $(diagnostic())")) === (:thrown, 42)
     @test calls[] == 2
     for value in ("literal message", DomainError(7, "invalid"), CustomException(7), [1, 2])
-        @test outcome(() -> (@⎋∃ value error("unused fallback"))) === (:thrown, value)
+        @test outcome(() -> (@⎋∃ value error("unused default"))) === (:thrown, value)
         @test outcome(() -> (@⎋■ value)) === (:thrown, value)
         @test (@⎋∃ nothing value) === value
         @test (@⎋■ missing value) === value

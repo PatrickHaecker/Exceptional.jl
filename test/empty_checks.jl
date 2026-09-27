@@ -16,8 +16,8 @@ end
 
 nonempty(collection) = (result = @⦱ collection; (:continued, result))
 empty(collection) = (result = @∅ collection; (:continued, result))
-nonempty_fallback(collection, fallback) = (result = @⦱ collection fallback; (:continued, result))
-empty_fallback(collection, fallback) = (result = @∅ collection fallback; (:continued, result))
+nonempty_default(collection, default) = (result = @⦱ collection default; (:continued, result))
+empty_default(collection, default) = (result = @∅ collection default; (:continued, result))
 
 function observed_nonempty(collection, evaluations)
     value = :caller_value
@@ -49,10 +49,10 @@ end
         @test sites.nonempty(nonempty_collection) === (:continued, nonempty_collection)
         @test sites.empty(empty_collection) === (:continued, empty_collection)
         @test sites.empty(nonempty_collection) === nonempty_collection
-        @test sites.nonempty_fallback(empty_collection, nothing) === nothing
-        @test sites.nonempty_fallback(nonempty_collection, nothing) === (:continued, nonempty_collection)
-        @test sites.empty_fallback(nonempty_collection, missing) === missing
-        @test sites.empty_fallback(empty_collection, missing) === (:continued, empty_collection)
+        @test sites.nonempty_default(empty_collection, nothing) === nothing
+        @test sites.nonempty_default(nonempty_collection, nothing) === (:continued, nonempty_collection)
+        @test sites.empty_default(nonempty_collection, missing) === missing
+        @test sites.empty_default(empty_collection, missing) === (:continued, empty_collection)
     end
     for (callable, accepts_empty) in ((sites.observed_nonempty, false), (sites.observed_empty, true))
         for empty in (false, true)

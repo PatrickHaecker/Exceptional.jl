@@ -72,7 +72,7 @@ function checked(input)
 end
 
 returned(input) = (@⊤ input > 0 @once FixedError("positive required"); input)
-runtime_checked(input, diagnostic) = (@⎋ input > 0 diagnostic; input)
+runtime_checked(input, default) = (@⎋ input > 0 default; input)
 mutable_checked(input) = (@⎋ input > 0 @once mutable_error; input)
 string_checked(input) = (@⎋ input > 0 @once "raw string"; input)
 tuple_checked(input) = (@⎋ input > 0 @once (123456789, "payload"); input)
@@ -129,9 +129,9 @@ end
     @test OnceSites.constructions[] == 1
     @test OnceSites.checked(1) == 1
     @test OnceSites.checked(1.0) == 1.0
-    for diagnostic in (42, (123456789, "payload"), nothing, Ref(42), OnceSites.mutable_error)
-        @test OnceSites.runtime_checked(1, diagnostic) == 1
-        @test once_caught(OnceSites.runtime_checked, -1, diagnostic) === diagnostic
+    for default in (42, (123456789, "payload"), nothing, Ref(42), OnceSites.mutable_error)
+        @test OnceSites.runtime_checked(1, default) == 1
+        @test once_caught(OnceSites.runtime_checked, -1, default) === default
     end
     @test once_caught(OnceSites.runtime_checked, -1, "raw string") isa ArgumentError
     @test once_caught(OnceSites.runtime_checked, -1, "raw string").msg == "raw string"

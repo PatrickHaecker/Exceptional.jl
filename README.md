@@ -9,9 +9,9 @@ The macro names consist of
 
 | Prefix | When the check holds | LaTeX completion |
 | --- | --- | --- |
-| (none) | Continue with the tested value | Not applicable |
-| `⏎` | Return the tested value from the enclosing function | `\varcarriagereturn` |
-| `⎋` | Throw the tested value | `\escape` |
+| (none) | Continue with `value` | (not applicable) |
+| `⏎` | Return `value` from the function | `\varcarriagereturn` |
+| `⎋` | Throw `value` | `\escape` |
 
 | Check | Meaning | Default on failure | LaTeX completion |
 | --- | --- | --- | --- |
@@ -26,32 +26,33 @@ The macro names consist of
 | `⦱` | `!isempty(value)` | `value` | `\emptysetobar` |
 | `∅` | `isempty(value)` | `value` | `\emptyset` |
 
-Type a listed LaTeX sequence followed by Tab in Julia's REPL to insert the symbol.
-The LaTeX completions for `⎋` and `✗` need at least Julia 1.14.
+The optional second argument, `default`, is evaluated only when the check fails.
 
 | Suffix | When the check fails |
 | --- | --- |
-| `⏎` / (none, without a prefix) | Return the exceptional value from the enclosing function |
-| `⎋` | Throw the diagnostic, converting a message to an `ArgumentError` |
-| (none, with a prefix) | Continue with the fallback |
+| `⏎` / (none, without a prefix) | Return `default` from the function |
+| `⎋` | Throw `default`; generate `ArgumentError` if omitted |
+| (none, with a prefix) | Continue with `default` |
 
 All nine forms support each check. So in the following, you can replace `∃` by any other check.
 
 | Form | Check holds | Check fails |
 | --- | --- | --- |
-| `@∃ value exceptional` | Continue with `value` | Return `exceptional` |
-| `@∃⏎ value exceptional` | Continue with `value` | Return `exceptional` |
-| `@∃⎋ value diagnostic` | Continue with `value` | Throw diagnostic |
-| `@⏎∃ value fallback` | Return `value` | Continue with `fallback` |
-| `@⎋∃ value fallback` | Throw `value` | Continue with `fallback` |
-| `@⏎∃⏎ value exceptional` | Return `value` | Return `exceptional` |
-| `@⏎∃⎋ value diagnostic` | Return `value` | Throw diagnostic |
-| `@⎋∃⏎ value exceptional` | Throw `value` | Return `exceptional` |
-| `@⎋∃⎋ value diagnostic` | Throw `value` | Throw diagnostic |
+| `@∃ value default` | Continue with `value` | Return `default` |
+| `@∃⏎ value default` | Continue with `value` | Return `default` |
+| `@∃⎋ value default` | Continue with `value` | Throw `default` |
+| `@⏎∃ value default` | Return `value` | Continue with `default` |
+| `@⎋∃ value default` | Throw `value` | Continue with `default` |
+| `@⏎∃⏎ value default` | Return `value` | Return `default` |
+| `@⏎∃⎋ value default` | Return `value` | Throw `default` |
+| `@⎋∃⏎ value default` | Throw `value` | Return `default` |
+| `@⎋∃⎋ value default` | Throw `value` | Throw `default` |
+
+Type a listed LaTeX sequence followed by Tab in Julia's REPL to insert the symbol.
+The LaTeX completions for `⎋` and `✗` need at least Julia 1.14.
 
 Continuing means evaluating to a value without exiting the enclosing function.
 The tested expression is evaluated once, preserving short-circuit behavior.
-The second argument is evaluated only when the check fails.
 An explicit `@once` initializer instead runs during macro expansion (see below).
 
 Tested values are preserved, including custom objects recognized by `isnothing`,
@@ -80,15 +81,15 @@ Return actions do not implicitly throw exception objects or strings.
 
 Throw prefixes pass the tested value directly to `throw` when the check holds,
 including strings, Booleans, and other non-exception objects. Without a suffix, they
-evaluate to the fallback, whose default is listed in the table above.
-The fallback is evaluated only when the check fails and is never implicitly thrown.
+continue with the default listed in the table when the check fails. The default is
+never implicitly thrown by the prefix.
 For example, `@⎋∃ validation_error` throws a present error object and continues
 with `nothing` when it is absent.
 
-Throw suffixes evaluate diagnostics only on the throwing branch. An `AbstractString`
-diagnostic becomes an `ArgumentError`, while every other value is thrown unchanged.
-With no diagnostic, the error reports the failed check, tested source expression,
-and evaluated result.
+Throw suffixes use the default only on the throwing branch. An `AbstractString`
+default becomes an `ArgumentError`; every other non-`nothing` value is thrown
+unchanged. With a `nothing` default, the generated error reports the failed check,
+tested source expression, and evaluated result.
 
 For example, `@⏎∃⎋ lookup(key) "not found"` returns a present result and throws an
 `ArgumentError` otherwise. `@⎋∃⏎ validation_error false` throws a present error object
@@ -116,8 +117,8 @@ collections, and custom types implementing `isempty`. They do not treat `nothing
 or `missing` as empty sentinels. Any errors or iteration side effects from the
 type's `isempty` implementation are preserved.
 
-All nine affix combinations are available. Throw suffixes retain the usual
-diagnostic behavior, for example `@⦱⎋ items "items must not be empty"`.
+All nine affix combinations are available. A throw suffix can be given a message,
+for example `@⦱⎋ items "items must not be empty"`.
 
 ## Returned Exceptions
 
@@ -141,16 +142,14 @@ function recover_input(input)
 end
 ```
 
-Both checks evaluate the tested expression once. Their default exceptional value
-or fallback is that already evaluated value. An explicit second argument replaces
-the default, for example `@✓ compute(input) nothing` returns `nothing` on failure.
+Both checks evaluate the tested expression once. Without a second argument, their
+default is that already evaluated value. An explicit second argument replaces the
+default, for example `@✓ compute(input) nothing` returns `nothing` on failure.
 These checks inspect returned objects with `isa Exception`; they do not catch
 thrown exceptions. `nothing` and `missing` are non-exception results.
 
-All nine affix combinations are available. Throw suffixes retain the usual
-diagnostic behavior, including an `ArgumentError` describing the failed check
-when the diagnostic is omitted. Use `@⎋✗ result` to throw a returned exception
-itself and continue with a non-exception result unchanged.
+All nine affix combinations are available. For example, `@⎋✗ result` throws the
+tested value if it is an `Exception` and continues with it unchanged otherwise.
 
 ## Boolean Shorthands
 
@@ -158,12 +157,12 @@ Omitting `⊤` gives these equivalent spellings:
 
 | Shorthand | Explicit form | On `true` | On `false` |
 | --- | --- | --- | --- |
-| `@⏎` | `@⊤⏎` | Continue with `true` | Return exceptional value |
-| `@⎋` | `@⊤⎋` | Continue with `true` | Throw diagnostic |
-| `@⏎⏎` | `@⏎⊤⏎` | Return `true` | Return exceptional value |
-| `@⏎⎋` | `@⏎⊤⎋` | Return `true` | Throw diagnostic |
-| `@⎋⏎` | `@⎋⊤⏎` | Throw `true` | Return exceptional value |
-| `@⎋⎋` | `@⎋⊤⎋` | Throw `true` | Throw diagnostic |
+| `@⏎` | `@⊤⏎` | Continue with `true` | Return `default` |
+| `@⎋` | `@⊤⎋` | Continue with `true` | Throw `default` |
+| `@⏎⏎` | `@⏎⊤⏎` | Return `true` | Return `default` |
+| `@⏎⎋` | `@⏎⊤⎋` | Return `true` | Throw `default` |
+| `@⎋⏎` | `@⎋⊤⏎` | Throw `true` | Return `default` |
+| `@⎋⎋` | `@⎋⊤⎋` | Throw `true` | Throw `default` |
 
 A single affix is always a suffix and acts on `false`. With two affixes, the
 first acts on `true` and the second on `false`. Prefix-only forms still require
@@ -173,7 +172,8 @@ shorthand for `@⊤`.
 
 The condition must be a `Bool` and is evaluated once. The optional second
 argument is evaluated only on `false`. Return suffixes default to `nothing`.
-Throw suffixes default to a diagnostic describing the failed check.
+Without a second argument, throw suffixes generate an `ArgumentError` describing
+the failed check.
 
 ```julia
 using Exceptional
@@ -189,14 +189,14 @@ function require_positive(input)
 end
 ```
 
-Literal string diagnostics use the same automatic exception storage as the
-explicit forms.
+Literal string defaults use the same automatic exception storage as the explicit
+forms.
 
 ## Allocation-free Exceptions
 
-Use a literal string diagnostic to throw an `ArgumentError` without allocating a
-new exception or message on each failure. Exceptional prepares the exception
-once at compile-time and reuses it at run-time:
+Use a literal string as the second argument to throw an `ArgumentError` without
+allocating a new exception or message on each failure. Exceptional prepares the
+exception once at compile-time and reuses it at run-time:
 
 ```julia
 using Exceptional
@@ -225,11 +225,11 @@ end
 `@once` evaluates its expression in the caller's module during macro expansion,
 once per annotated call site, and reuses the object across calls and method
 specializations. It can use existing module globals, not function locals.
-`@once` preserves its result without conversion. Throwing suffixes still interpret
-strings as diagnostics: `@⎋ condition @once "message"` throws a cached
-`ArgumentError`. Only concrete `String` messages get cached wrappers. Other
-`AbstractString` diagnostics are wrapped on failure without forcing their text
-during macro expansion. Returns and throw prefixes preserve the stored value.
+`@once` preserves its result without conversion. A string default on a throw suffix,
+as in `@⎋ condition @once "message"`, throws a cached `ArgumentError`. Only
+concrete `String` messages get cached wrappers. Other `AbstractString` defaults are
+wrapped on failure without forcing their text during macro expansion. Returns and
+throw prefixes preserve the stored value.
 Mutable objects are shared without copying or
 synchronization, so callers must coordinate mutation and concurrent use.
 
@@ -264,5 +264,5 @@ Avoiding allocations does not remove the cost of throwing.
 
 Throwing can still allocate during compilation, when Julia grows its exception
 stack or collects backtraces, or when a handler formats or prints the error.
-Exception reuse applies to literal string diagnostics and explicit `@once`
-expressions. Other diagnostics can still allocate on failure.
+Exception reuse applies to literal string defaults and explicit `@once` expressions.
+Other defaults can still allocate when thrown.
