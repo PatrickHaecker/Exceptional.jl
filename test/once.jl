@@ -199,3 +199,19 @@ end
     @test Base.isexported(Exceptional, Symbol("@once"))
     @test Docs.hasdoc(Exceptional, Symbol("@once")) skip=(VERSION < v"1.11")
 end
+
+@testset "Precompiled once storage" begin
+    script = """
+        pushfirst!(LOAD_PATH, $(repr(@__DIR__)))
+        Base.compilecache(Base.PkgId("StoredDiagnostics"))
+        using StoredDiagnostics
+        @assert !isnothing(Base.pkgorigins[Base.PkgId(StoredDiagnostics)].cachepath)
+        @assert StoredDiagnostics.once_constructions[] == 1
+        stored = StoredDiagnostics.stored_error()
+        @assert stored isa DomainError && stored.val == -1 && stored.msg == "precompiled once"
+        @assert stored === StoredDiagnostics.stored_error()
+        @assert StoredDiagnostics.once_constructions[] == 1
+        """
+    project = dirname(@__DIR__)
+    @test success(`$(Base.julia_cmd()) --startup-file=no --heap-size-hint=4G --project=$project -e $script`)
+end

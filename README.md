@@ -266,3 +266,9 @@ Throwing can still allocate during compilation, when Julia grows its exception
 stack or collects backtraces, or when a handler formats or prints the error.
 Exception reuse applies to literal string defaults and explicit `@once` expressions.
 Other defaults can still allocate when thrown.
+
+## Precompilation
+
+Precompile coverage targets Julia 1.13 and 1.14 and includes common macro-expansion,
+storage, and diagnostic paths. Other syntax and user-defined types can still
+require compilation on first use. Julia 1.10 remains supported.
